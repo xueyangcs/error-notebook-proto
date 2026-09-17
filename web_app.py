@@ -50,6 +50,11 @@ PAGE_CSS = """
     .qtrack { flex: 1; height: 6px; background: #e0e3e8; border-radius: 99px; overflow: hidden; }
     .qtrack i { display: block; height: 100%; background: #3b82f6; border-radius: 99px; }
     a { color: #06c; }
+    .busy { display: flex; margin-top: 1rem; color: #1d4ed8; align-items: center; gap: 0.5rem; font-size: 0.95rem; }
+    .busy[hidden] { display: none !important; }
+    .spin { width: 1rem; height: 1rem; border: 2px solid #bfdbfe; border-top-color: #1d4ed8; border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    button:disabled { cursor: not-allowed; opacity: 0.65; }
 """
 
 RESULT_CSS = """
@@ -238,7 +243,7 @@ def _index_html(snap: dict[str, dict[str, int]], need_password: bool) -> str:
   <h1>作业照片批改</h1>
   <p class="hint">上传含题干与学生作答的图片，系统将调用 Gemini 生成批改报告。</p>
   {_quota_html(snap)}
-  <form action="/grade" method="post" enctype="multipart/form-data">
+  <form id="grade-form" action="/grade" method="post" enctype="multipart/form-data">
     {password_field}
     <label>作业图片
       <input type="file" name="image" accept="image/*" required />
@@ -253,8 +258,12 @@ def _index_html(snap: dict[str, dict[str, int]], need_password: bool) -> str:
     <label>学科
       <input type="text" name="subject" value="数学" />
     </label>
-    <button type="submit">开始批改</button>
+    <button type="submit" id="grade-submit">开始批改</button>
   </form>
+  <p id="grade-status" class="busy" hidden role="status" aria-live="polite">
+    <span class="spin" aria-hidden="true"></span>
+    <span>正在批改，请稍候…</span>
+  </p>
   <script>
     function renderQuota(q) {{
       const el = document.getElementById("quota");
@@ -275,6 +284,30 @@ def _index_html(snap: dict[str, dict[str, int]], need_password: bool) -> str:
       fetch("/api/quota").then(r => r.json()).then(renderQuota).catch(() => {{}});
     }}
     refreshQuota();
+    (function () {{
+      const form = document.getElementById("grade-form");
+      if (!form) return;
+      form.addEventListener("submit", function (event) {{
+        if (form.dataset.busy === "1") {{
+          event.preventDefault();
+          return;
+        }}
+        form.dataset.busy = "1";
+        form.setAttribute("aria-busy", "true");
+        const status = document.getElementById("grade-status");
+        if (status) status.hidden = false;
+        const btn = document.getElementById("grade-submit");
+        if (btn) {{
+          btn.disabled = true;
+          btn.textContent = "正在批改…";
+        }}
+        window.setTimeout(function () {{
+          form.querySelectorAll("input, select, button, textarea").forEach(function (el) {{
+            el.disabled = true;
+          }});
+        }}, 0);
+      }});
+    }})();
   </script>
 """
     return _shell_page("作业批改", body)
