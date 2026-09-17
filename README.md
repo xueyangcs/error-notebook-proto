@@ -76,15 +76,25 @@ python -m unittest discover -s tests -v
 
 ```bash
 export GEMINI_API_KEY='你的密钥'
+export ACCESS_PASSWORD='网页访问密码'
 uvicorn web_app:app --host 0.0.0.0 --port 8080
 # 或：python web_app.py
-# Docker：docker build -t error-notebook . && docker run -e GEMINI_API_KEY -p 8080:8080 error-notebook
+# Docker：docker build -t error-notebook . && docker run -e GEMINI_API_KEY -e ACCESS_PASSWORD -p 8080:8080 error-notebook
 ```
 
-浏览器打开 `http://127.0.0.1:8080/`，上传图片并选择学段/学科。
+浏览器打开 `http://127.0.0.1:8080/`，填写访问密码、上传图片并选择学段/学科。密码正确后会写入 Cookie，之后不必重复输入。
+
+- **`ACCESS_PASSWORD`**：网页访问密码，只从环境变量读取，不要写进代码或提交进 git。上传页的批改表单与 `POST /grade` 需要密码；`/healthz` 保持公开（供 Railway 健康检查）。密码错误会返回中文提示，且**不会**调用 Gemini、**不会**消耗配额。
+- **全站共享配额**（内存计数，单实例有效，非按 IP）：
+  - 每分钟最多 **3** 次批改
+  - 每小时最多 **10** 次
+  - 每天最多 **20** 次
+- 页顶显示剩余次数条（如 `剩余 2/3 次/分 · 8/10 次/时 · 15/20 次/天`），批改成功或触发限流后都会刷新。超出上限返回 **HTTP 429**。`GET /api/quota` 返回当前剩余 JSON。
+
+未配置 `ACCESS_PASSWORD` 时无法批改（返回 503），以免网页在无密码时对公网开放。
 
 ## 说明
 
-- 密钥只读取环境变量 `GEMINI_API_KEY`
+- 密钥只读取环境变量 `GEMINI_API_KEY`；网页密码只读取 `ACCESS_PASSWORD`
 - 每次运行对一张图做 **一次** 多模态调用
 - 本原型不做多题切分、错题本持久化或 Mathpix OCR
