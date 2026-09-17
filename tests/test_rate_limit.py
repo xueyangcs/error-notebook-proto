@@ -184,6 +184,24 @@ class TestWebAppHttp(unittest.TestCase):
         self.assertIn('name="password"', response.text)
 
     @patch.dict(os.environ, {"ACCESS_PASSWORD": "s3cret"}, clear=False)
+    def test_index_shows_in_progress_ui_on_grade_submit(self) -> None:
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        html = response.text
+        self.assertIn('id="grade-form"', html)
+        self.assertIn('id="grade-submit"', html)
+        self.assertIn('id="grade-status"', html)
+        self.assertIn("正在批改，请稍候", html)
+        self.assertIn('addEventListener("submit"', html)
+        self.assertIn("aria-busy", html)
+        self.assertIn(".disabled = true", html)
+        # Password, quota bars, and rate-limit copy must stay unchanged.
+        self.assertIn('name="password"', html)
+        self.assertIn('id="quota"', html)
+        self.assertIn("剩余 3/3 次/分", html)
+        self.assertIn('fetch("/api/quota")', html)
+
+    @patch.dict(os.environ, {"ACCESS_PASSWORD": "s3cret"}, clear=False)
     def test_wrong_password_is_401_and_skips_gemini(self) -> None:
         with patch.object(web_app, "grade_bytes") as mock_grade:
             response = self.client.post(
